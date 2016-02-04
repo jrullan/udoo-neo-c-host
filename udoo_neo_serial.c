@@ -135,6 +135,15 @@ void getCommand(unsigned char* cmd, unsigned char* buff, int size){
 	return;
 }
 
+//Print to stdout the characters in a char array
+void printText(char* text){
+	int i = 0;
+	while(text[i] != 0)
+	{
+		printf("%d ",text[i++]);
+	}
+}
+
 //Compares two strings to see if they are equal
 //Returns 1 if equal, 0 if they are not equal
 int compareText(unsigned char* text1, unsigned char* text2)
@@ -165,13 +174,6 @@ int compareText(unsigned char* text1, unsigned char* text2)
 }
 
 
-void printText(char* text){
-	int i = 0;
-	while(text[i] != 0)
-	{
-		printf("%c",text[i++]);
-	}
-}
 
 //Main program
 int main(void) {
