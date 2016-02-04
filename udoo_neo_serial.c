@@ -111,6 +111,7 @@ int stringSize(unsigned char* data){
 	int dataSize = 0;
 	while(data[dataSize]!=0){	// end of string == 0
 		dataSize++;
+		//printf("%c ",data[dataSize]);
 	}
 	return dataSize;	
 }
@@ -134,7 +135,43 @@ void getCommand(unsigned char* cmd, unsigned char* buff, int size){
 	return;
 }
 
+//Compares two strings to see if they are equal
+//Returns 1 if equal, 0 if they are not equal
+int compareText(unsigned char* text1, unsigned char* text2)
+{
+	int size1 = stringSize(text1);
+	int size2 = stringSize(text2);
+	
+	printf("Text1 is ");
+	printText(text1);
+	printf("\n");
+	
+	printf("Text2 is ");
+	printText(text2);
+	printf("\n");
+	
+	if(size1 == size2){
+		int i;
+		for(i=0;i<size1;i++){
+			if(text1[i] != text2[i]){
+				//printf("Different strings %c vs %c\n",text1[i],text2[i]);
+				return 0;
+			}
+		}
+		return 1;
+	}
+	printf("Not same size. %d vs %d\n",size1,size2);
+	return 0;
+}
 
+
+void printText(char* text){
+	int i = 0;
+	while(text[i] != 0)
+	{
+		printf("%c",text[i++]);
+	}
+}
 
 //Main program
 int main(void) {
@@ -152,8 +189,14 @@ int main(void) {
 		
 		if(receivedBytes > 0){						// Data found!
 			//printf("receivedBytes = %d\n",receivedBytes);
-			int i,pos;
+			int i,result;
 			getCommand(cmd,inBuff,receivedBytes);
+			//result = compareText(cmd,"Debug");
+			if(compareText(cmd,"Debug")){
+				printf("Debug command received\n");
+				printf("%s\n",cmd);
+			}
+			/*
 			for(i = 0; i < receivedBytes; i++)
 			{
 				printf("%c",cmd[i]);
@@ -161,6 +204,7 @@ int main(void) {
 			time_t now = time(NULL);
 			printf(" %s",ctime(&now));
 			printf("\n");
+			*/
 		}else if(receivedBytes == 0){				//No data yet! go back to loop
 			continue;					
 		}else if(receivedBytes < 0){				//Error reading, exit.
