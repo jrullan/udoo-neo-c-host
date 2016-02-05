@@ -244,6 +244,33 @@ int main(void) {
 				printf("%s\n",ctime(&now));	
 			}
 			
+			if(compareText(cmd,"Email")){
+				time_t now = time(NULL);
+				printf("Sending email...\n");
+
+				//1. Open email file
+				FILE* fp;
+				fp = fopen("/home/udooer/mail.txt","w+");
+				
+				//2. Write To, From, Subject and Contents
+				fputs("To: jerullan@gmail.com\n",fp);
+				fputs("From: udooneo@udooneo.com\n",fp);
+				fputs("Subject: NEO Security Alert\n",fp);
+				fputs("\n",fp);
+				fprintf(fp,"%s %s\n",par,ctime(&now));
+				fputs("\n",fp);
+				fputs("Message sent by Udoo Neo.\n",fp);
+				fputs("=========================\n",fp);
+				fputs("\n",fp);
+
+				//3. Close file
+				fclose(fp);
+				
+				//4. send email
+				int status = system("ssmtp jerullan@gmail.com < ~/mail.txt");
+				printf("Email sent successfully!\n");
+			}
+			
 		}else if(receivedBytes == 0){				//No data yet! go back to loop
 			continue;					
 		}else if(receivedBytes < 0){				//Error reading, exit.
