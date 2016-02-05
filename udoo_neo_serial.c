@@ -111,26 +111,74 @@ int stringSize(unsigned char* data){
 	int dataSize = 0;
 	while(data[dataSize]!=0){	// end of string == 0
 		dataSize++;
-		//printf("%c ",data[dataSize]);
 	}
 	return dataSize;	
 }
 
 //Parses the command out of the input buffer into the cmd variable
+//Copies the characters between : and ( if found.
+void getCmd(unsigned char* buff, unsigned char* cmd){
+	int i;
+	int found = 0;
+	
+	while(buff[i] != 0)
+	{
+		if(buff[i] == ':') found = i;
+		if(found){
+			if(buff[i] == '(') break;
+			cmd[i-found-1] = buff[i];
+		}
+		i++;
+	}
+	
+	return;
+}
+
+//Parses the parameters out of the input buffer into the par variable
+//Copies the characters between : and ( if found.
+void getPar(unsigned char* buff, unsigned char* par){
+	int i;
+	int found = 0;
+	
+	while(buff[i] != 0)
+	{
+		if(buff[i] == '(') found = i;
+		if(found){
+			if(buff[i] == ')') break;
+			par[i-found-1] = buff[i];
+		}
+		i++;
+	}
+	
+	return;
+}
+
+//Parses the command out of the input buffer into the cmd variable
 void getCommand(unsigned char* cmd, unsigned char* buff, int size){
 	int i;
-	int found = -1;
+	int found = 0;
 	
+	while(buff[i] != 0)
+	{
+		if(buff[i] == ':') found = i;
+		if(found){
+			if(buff[i] == '(') break;
+			cmd[i-found-1] = buff[i];
+		}
+		i++;
+	}
+	
+	/*
+	 * Alternative way
 	for(i = 0; i < size; i++)
 	{
 		if(buff[i] == '(') break;
-		if(found==1){ 
-			cmd[i] = buff[i];
-		}else{
-			//cmd[i] = '=';
+		if(found){ 
+			cmd[i-found-1] = buff[i];
 		}
-		if(buff[i] == ':') found = 1;
+		if(buff[i] == ':') found = i;
 	}
+	*/
 	
 	return;
 }
@@ -150,26 +198,19 @@ int compareText(unsigned char* text1, unsigned char* text2)
 {
 	int size1 = stringSize(text1);
 	int size2 = stringSize(text2);
-	
-	printf("Text1 is ");
-	printText(text1);
-	printf("\n");
-	
-	printf("Text2 is ");
-	printText(text2);
-	printf("\n");
-	
+		
 	if(size1 == size2){
 		int i;
 		for(i=0;i<size1;i++){
 			if(text1[i] != text2[i]){
-				//printf("Different strings %c vs %c\n",text1[i],text2[i]);
+				//Different characters
 				return 0;
 			}
 		}
+		//Identical strings
 		return 1;
 	}
-	printf("Not same size. %d vs %d\n",size1,size2);
+	//Different sizes
 	return 0;
 }
 
@@ -181,6 +222,7 @@ int main(void) {
 	unsigned char outBuff[BUFFER_MAX];
 	unsigned char inBuff[BUFFER_MAX];
 	unsigned char* cmd = malloc(BUFFER_MAX * sizeof(char));
+	unsigned char* par = malloc(BUFFER_MAX * sizeof(char));
 	
 	// Open serial file descriptor
 	int fd = openSerial();
@@ -190,23 +232,18 @@ int main(void) {
 		receivedBytes = read(fd,inBuff,BUFFER_MAX);
 		
 		if(receivedBytes > 0){						// Data found!
-			//printf("receivedBytes = %d\n",receivedBytes);
+
 			int i,result;
-			getCommand(cmd,inBuff,receivedBytes);
-			//result = compareText(cmd,"Debug");
+			getCmd(inBuff,cmd);
+			getPar(inBuff,par);
+			
 			if(compareText(cmd,"Debug")){
-				printf("Debug command received\n");
-				printf("%s\n",cmd);
+				//printf("Debug command received\n");
+				time_t now = time(NULL);
+				printf("%s ",par);
+				printf("%s\n",ctime(&now));	
 			}
-			/*
-			for(i = 0; i < receivedBytes; i++)
-			{
-				printf("%c",cmd[i]);
-			}
-			time_t now = time(NULL);
-			printf(" %s",ctime(&now));
-			printf("\n");
-			*/
+			
 		}else if(receivedBytes == 0){				//No data yet! go back to loop
 			continue;					
 		}else if(receivedBytes < 0){				//Error reading, exit.
@@ -219,6 +256,8 @@ int main(void) {
 	}
 	
 	free((void*)cmd);
+	free((void*)par);	
+	
 	//Close serial's file descriptor
 	close(fd);	
 }
