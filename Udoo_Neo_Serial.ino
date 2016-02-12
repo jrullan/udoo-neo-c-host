@@ -17,6 +17,8 @@
 byte buff[BUFFER_MAX];
 unsigned char *intToStr;
 boolean motionDetected = false;
+long emailDelay = 60000;
+long emailAcc = 0;
 int l = 0;
 
 void setup() {
@@ -40,23 +42,20 @@ void loop() {
   if(digitalRead(PIR)==HIGH){
     if(!motionDetected){         // One Shot
       digitalWrite(LED1,HIGH);
-      sendLine("ard:Debug(Motion Detected)", l++);
+      if(done(emailDelay,&emailAcc)){ 
+        //sendCommand(":Debug",emailAcc);
+        //sendCommand(":Debug","jerullan@gmail.com");
+        sendCommand(":SetEmail","jerullan@gmail.com");
+        //sendCommand(":SetEmail","jerullan@yahoo.com");
+        sendCommand(":Email","Motion Detected");
+      }
     }
     motionDetected = true;
   }else{
     digitalWrite(LED1,LOW);
     motionDetected = false;
   }
-  
 
-  //Serial.print(l++);
-  //sendLine(" From Arduino ");
-  //Serial.print("From Arduino ");
-  //sendLine(" ");    
-  
-
-  Serial.flush();
-  delay(100); //Minimum time to wait after serial flush.
 }
 
 //======================================================
@@ -74,45 +73,14 @@ byte readSerial(unsigned char *buff){
 }
 
 /*
- * Sends contents of the buffer through the serial
- * as a line. Ending in new line.
- */
-void sendLine(unsigned char *buff, int bytes){
-  if(bytes > BUFFER_MAX) bytes = BUFFER_MAX;
-  Serial.write(buff,bytes);
-  Serial.print('\n');
-}
-
-/*
- * Sends contents of the buffer through the serial
- * as a line. Ending in new line.
- */
-void sendLine(String str,unsigned char *buff, int bytes){
-  if(bytes > BUFFER_MAX) bytes = BUFFER_MAX;
-  Serial.print(str);
-  Serial.write(buff,bytes);
-  Serial.print('\n');
-}
-
-/*
- * Sends a number through the serial
- * as a line. Ending in new line.
- */
-void sendLine(int number){
-  Serial.print(number);
-  Serial.print('\n');
-}
-
-/*
  * Sends a string through the serial
  * as a line. Ending in new line.
  */
 void sendLine(String str){
   str += '\n';            //append newline character
   Serial.print(str);
-  //byte len = str.length()+1; //calculate length of string
-  //str.getBytes(buff,len);      //copy string to buffer
-  //Serial.write(buff,len);      //write buffer to serial
+  Serial.flush();
+  delay(100);
 }
 
 /*
@@ -123,18 +91,41 @@ void sendLine(String str, int value){
   str += value;           //append value to string
   str += '\n';            //append newline character
   Serial.print(str);
-  //byte len = str.length() + 1; //calculate length of string
-  //str.getBytes(buff,len);      //copy string to buffer
-  //Serial.write(buff,len);      //write buffer to serial
+  Serial.flush();
+  delay(100);
 }
 
 /*
- * Sends a string and an float value through the serial
+ * Sends a string and an integer value through the serial
  * as a line. Ending in new line.
  */
-void sendLine(String str, int value, int places){
-  Serial.print(str);
-  Serial.print(value,places);
-  Serial.print('\n');
+void sendCommand(String cmd, int par){
+  cmd += '(';             // :cmd(
+  cmd += par;           //append value to string
+  cmd += ')';             // :cmd(
+  cmd += '\n';            //append newline character
+  Serial.print(cmd);
+  Serial.flush();
+  delay(100);
+}
+
+// string par version of above.
+void sendCommand(String cmd, String par){
+  cmd += '(';             // :cmd(
+  cmd += par;           //append value to string
+  cmd += ')';             // :cmd(
+  cmd += '\n';            //append newline character
+  Serial.print(cmd);
+  Serial.flush();
+  delay(100);  
+}
+
+// Timer utility
+boolean done(long timeDelay, long* accumulated){
+  if(millis()-*accumulated > timeDelay){
+    *accumulated = millis();
+    return true;
+  }
+  return false;
 }
 
