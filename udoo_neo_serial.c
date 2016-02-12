@@ -118,78 +118,50 @@ int stringSize(unsigned char* data){
 //Parses the command out of the input buffer into the cmd variable
 //Copies the characters between : and ( if found.
 void getCmd(unsigned char* buff, unsigned char* cmd){
-	int i;
+	int i=0;	// WHY DID I FORGET TO INITIALIZE IT TO 0??????
 	int found = 0;
+	clearString(cmd);
 	
 	while(buff[i] != 0)
 	{
-		if(buff[i] == ':') found = i;
+		if(buff[i] == ':') found = ++i;
 		if(found){
 			if(buff[i] == '(') break;
-			cmd[i-found-1] = buff[i];
+			cmd[i-found] = buff[i];	
 		}
 		i++;
 	}
-	
 	return;
 }
 
 //Parses the parameters out of the input buffer into the par variable
 //Copies the characters between : and ( if found.
 void getPar(unsigned char* buff, unsigned char* par){
-	int i;
-	int found = 0;
+	int i = 0; // WHY DID I FORGET TO INITIALIZE IT TO 0??????
+	int found = 0;			
+	clearString(par);
 	
 	while(buff[i] != 0)
-	{
-		if(buff[i] == '(') found = i;
+	{	
+		if(buff[i] == '(') found = ++i;
 		if(found){
 			if(buff[i] == ')') break;
-			par[i-found-1] = buff[i];
+			par[i-found] = buff[i];
 		}
 		i++;
 	}
-	
-	return;
-}
-
-//Parses the command out of the input buffer into the cmd variable
-void getCommand(unsigned char* cmd, unsigned char* buff, int size){
-	int i;
-	int found = 0;
-	
-	while(buff[i] != 0)
-	{
-		if(buff[i] == ':') found = i;
-		if(found){
-			if(buff[i] == '(') break;
-			cmd[i-found-1] = buff[i];
-		}
-		i++;
-	}
-	
-	/*
-	 * Alternative way
-	for(i = 0; i < size; i++)
-	{
-		if(buff[i] == '(') break;
-		if(found){ 
-			cmd[i-found-1] = buff[i];
-		}
-		if(buff[i] == ':') found = i;
-	}
-	*/
-	
 	return;
 }
 
 //Print to stdout the characters in a char array
-void printText(char* text){
+void printText(unsigned char* text){
 	int i = 0;
 	while(text[i] != 0)
 	{
-		printf("%d ",text[i++]);
+		printf("%c",text[i]);
+		i++;
 	}
+	//printf("\n");
 }
 
 //Compares two strings to see if they are equal
@@ -215,14 +187,32 @@ int compareText(unsigned char* text1, unsigned char* text2)
 }
 
 
+// Function to append a string to another.
+void appendString(unsigned char* text, unsigned char* app){
+	int size1 = stringSize(text);
+	int size2 = stringSize(app);
+	int i;
+	for(i=size1;i<size1+size2;i++){
+		text[i] = app[i-size1];
+	}
+	text[size1+size2] = '\0';
+	return;
+}
+
+void clearString(unsigned char* text){
+	int size = stringSize(text);
+	//printf("Clearing %d characters\n",size);
+	memset(text,0,size);
+}
 
 //Main program
 int main(void) {
 	int dataAvailable,receivedBytes, sentBytes;
 	unsigned char outBuff[BUFFER_MAX];
 	unsigned char inBuff[BUFFER_MAX];
-	unsigned char* cmd = malloc(BUFFER_MAX * sizeof(char));
-	unsigned char* par = malloc(BUFFER_MAX * sizeof(char));
+	unsigned char* email = malloc(BUFFER_MAX * sizeof(char));
+			unsigned char* cmd = malloc((BUFFER_MAX+1) * sizeof(char));
+			unsigned char* par = malloc((BUFFER_MAX+1) * sizeof(char));
 	
 	// Open serial file descriptor
 	int fd = openSerial();
@@ -232,28 +222,57 @@ int main(void) {
 		receivedBytes = read(fd,inBuff,BUFFER_MAX);
 		
 		if(receivedBytes > 0){						// Data found!
-
-			int i,result;
+			time_t now = time(NULL); // timestamp
+			//printf("inBuff: ");
+			//printText(inBuff);
+			
 			getCmd(inBuff,cmd);
 			getPar(inBuff,par);
 			
+			printf("cmd: %s\n",cmd);
+			printf("par: %s\n",par);
+			printf("time: %s",ctime(&now));
+			
 			if(compareText(cmd,"Debug")){
-				//printf("Debug command received\n");
-				time_t now = time(NULL);
-				printf("%s ",par);
-				printf("%s\n",ctime(&now));	
+				//time_t now = time(NULL);
+				//printf("%s ",par);
+				//printf("%s\n",ctime(&now));	
+			}
+			
+			if(compareText(cmd,"SetEmail")){
+				/*
+				int i,size1,size2;
+				strcpy(email,"To: ");
+				size1 = stringSize(email);
+				size2 = stringSize(par);
+				for(i=size1;i<size1+size2;i++){
+					email[i] = par[i-size1];
+				}
+				*/
+				clearString(email);
+				appendString(email,"To: ");
+				appendString(email,par);
+				appendString(email,"\n");
+				printf("Setting email %s\n",email);
 			}
 			
 			if(compareText(cmd,"Email")){
 				time_t now = time(NULL);
-				printf("Sending email...\n");
-
+				if(stringSize(email)){
+					printf("Sending email to %s",email);
+				}
+				
+				
 				//1. Open email file
 				FILE* fp;
 				fp = fopen("/home/udooer/mail.txt","w+");
 				
 				//2. Write To, From, Subject and Contents
-				fputs("To: jerullan@gmail.com\n",fp);
+				//fputs("To: aparis27@gmail.com\n",fp);
+				if(stringSize(email)==0){
+					appendString(email,"To: jerullan@gmail.com\n");
+				}
+				fputs(email,fp);
 				fputs("From: udooneo@udooneo.com\n",fp);
 				fputs("Subject: NEO Security Alert\n",fp);
 				fputs("\n",fp);
@@ -267,10 +286,12 @@ int main(void) {
 				fclose(fp);
 				
 				//4. send email
-				int status = system("ssmtp jerullan@gmail.com < ~/mail.txt");
+				//int status = system("ssmtp jerullan@gmail.com < ~/mail.txt");
 				printf("Email sent successfully!\n");
+				
 			}
-			
+				
+
 		}else if(receivedBytes == 0){				//No data yet! go back to loop
 			continue;					
 		}else if(receivedBytes < 0){				//Error reading, exit.
@@ -281,9 +302,9 @@ int main(void) {
 		}
 		usleep(50000);	// poll time approx 50mS (faster crashes the app)
 	}
-	
-	free((void*)cmd);
-	free((void*)par);	
+				free((void*)cmd);
+			free((void*)par);	
+
 	
 	//Close serial's file descriptor
 	close(fd);	
