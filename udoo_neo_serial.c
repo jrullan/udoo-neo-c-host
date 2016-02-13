@@ -31,11 +31,20 @@
 #include <pthread.h>
 
 
-#define BUFFER_MAX 64
+#define BUFFER_MAX 128	// Originally I had this set to 64
+						// theoretically max size of arduino serial buffer
+						// but apparently the Neo implementation supports
+						// a higher limit.
+						
+#define PARS 10			// Max parameters to hold
+#define PARS_SIZE 24	// Max size of characters in each parameter
 
 const char* VALID_COMMANDS[] = {
 	"Database","Debug","Email","HTTPRequest","SetEmail","Shell"
 };
+
+//Array for parameters comming from arduino
+char PARAMETERS[PARS][PARS_SIZE];
 
 
 //Utility to configure the serial parameters
@@ -211,7 +220,6 @@ void getPar(unsigned char* buff,  char* par){
 	return;
 }
 
-
 //Checks if cmd correspond to any of the valid commands defined 
 //in VALID_COMMANDS
 int validCommand(char* cmd){
@@ -224,13 +232,40 @@ int validCommand(char* cmd){
 	return 0;
 }
 
+//Parse the parameters into the PARAMETERS array
+//Parameters must be divided by commas
+int parseParameters(char* par){
+	int i = 0;
+	int number = 0;
+	int pos = 0;
+	int p;
+
+	//Clear all parameters
+	for(p=0;p<PARS;p++){
+		clearString(PARAMETERS[p]);
+	}
+	
+	//Extract parameters into the PARAMETERS array
+	while(par[i]!=0){
+		if(par[i] == ','){
+			number++;
+			pos = i+1;	// add one to ignore the ',' 
+		}else{
+			PARAMETERS[number][i-pos]=par[i];
+		}
+		i++;
+	}
+	
+	return number+1; // Number of parameters found
+}
+
 //Main program
 int main(void) {
 	int receivedBytes;//, sentBytes;
 	//unsigned char outBuff[BUFFER_MAX];
 	unsigned char inBuff[BUFFER_MAX];
 	//Reserve memory
-	char* email = malloc(BUFFER_MAX * sizeof(char));
+	//char* email = malloc(BUFFER_MAX * sizeof(char));
 	char* cmd = malloc((BUFFER_MAX+1) * sizeof(char));
 	char* par = malloc((BUFFER_MAX+1) * sizeof(char));
 	
@@ -240,17 +275,25 @@ int main(void) {
 	//Loop to scan
 	while(1){
 		receivedBytes = read(fd,inBuff,BUFFER_MAX);
-		
 		if(receivedBytes > 0){						// Data found!
+			printf("\nPayload size: %d\n",receivedBytes);
+			
 			time_t now = time(NULL); // timestamp
 
 			getCmd(inBuff,cmd);
-			getPar(inBuff,par);
-			
 			if(!validCommand(cmd)){
-				printf("Invalid Command: %s\n",cmd);
+				printf("Invalid Command: %s\n\n",cmd);
 				continue;
 			}
+			
+			printf("Command: %s\n",cmd);
+			getPar(inBuff,par);
+			int pars = parseParameters(par);
+			int i = 0;
+			printf("Parameters found: %d\n",pars);
+			for(i=0;i<pars;i++) printf("Parameter %d - %s\n",i,PARAMETERS[i]);			
+			
+			//continue;
 			
 			if(compareText(cmd,"Debug")){
 				printf("cmd: %s\n",cmd);
@@ -261,43 +304,42 @@ int main(void) {
 				//printf("%s\n",ctime(&now));	
 			}
 			
-			if(compareText(cmd,"SetEmail")){
-				/*
-				int i,size1,size2;
-				strcpy(email,"To: ");
-				size1 = stringSize(email);
-				size2 = stringSize(par);
-				for(i=size1;i<size1+size2;i++){
-					email[i] = par[i-size1];
-				}
-				*/
-				clearString(email);
-				appendString(email,"To: ");
-				appendString(email,par);
-				appendString(email,"\n");
-				printf("Setting email as %s\n",par);
-			}
-			
 			if(compareText(cmd,"Email")){
-				if(stringSize(email)){
-					printf("Sending email %s",email);
-					printf("Email message: %s\n",par);
-				}
+				int status;
 				
+				if(pars < 3){  //Need at least the email address and a subject
+					printf("Error: Need 3 parameters: address, subject and message\n");
+					continue;
+				}
+
+				char* email[stringSize(PARAMETERS[0])+5];
+				char* subject[stringSize(PARAMETERS[1])+10];
+				
+				clearString((char*)email);
+				appendString((char*)email,"To: ");
+				appendString((char*)email,PARAMETERS[0]);
+				appendString((char*)email,"\n");				
+				
+				clearString((char*)subject);
+				appendString((char*)subject,"Subject: ");
+				appendString((char*)subject,PARAMETERS[1]);
+				appendString((char*)subject,"\n");				
+
 				//1. Open email file
 				FILE* fp;
 				fp = fopen("/home/udooer/mail.txt","w+");
 				
 				//2. Write To, From, Subject and Contents
-				//fputs("To: aparis27@gmail.com\n",fp);
-				if(stringSize(email)==0){
+				/*if(stringSize(email)==0){
 					appendString(email,"To: jerullan@gmail.com\n");
-				}
-				fputs(email,fp);
+				}*/
+				//clearString(email);
+				fputs((char*)email,fp);
 				fputs("From: udooneo@udooneo.com\n",fp);
-				fputs("Subject: NEO Security Alert\n",fp);
+				//fputs("Subject: NEO Security Alert\n",fp);
+				fputs((char*)subject,fp);
 				fputs("\n",fp);
-				fprintf(fp,"%s %s\n",par,ctime(&now));
+				fprintf(fp,"%s %s\n",PARAMETERS[2],ctime(&now));
 				fputs("\n",fp);
 				fputs("Message sent by Udoo Neo.\n",fp);
 				fputs("=========================\n",fp);
@@ -305,10 +347,21 @@ int main(void) {
 
 				//3. Close file
 				fclose(fp);
+				status = system("cat ~/mail.txt");
+				if(status == -1) printf("Error: could not execute command\n");
 				
 				//4. send email
-				//int status = system("ssmtp jerullan@gmail.com < ~/mail.txt");
-				printf("Email sent successfully! on %s\n",ctime(&now));
+				char ssmtpCommand[40];
+				strcpy(ssmtpCommand, "ssmtp ");
+				appendString((char*) ssmtpCommand, PARAMETERS[0]);
+				strcat(ssmtpCommand, " < ~/mail.txt");
+				printf("Command to execute: %s\n",ssmtpCommand);
+				status = system(ssmtpCommand);
+				if(status == -1){ 
+					printf("Error: could not send email\n");
+				}else{
+					printf("Email sent successfully! on %s\n",ctime(&now));
+				}
 				
 			}
 				
@@ -327,7 +380,7 @@ int main(void) {
 	//Free reserved memory
 	free((void*)cmd);
 	free((void*)par);
-	free((void*)email);
+	//free((void*)email);
 	//Close serial's file descriptor
 	close(fd);	
 }
