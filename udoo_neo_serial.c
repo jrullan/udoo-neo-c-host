@@ -212,6 +212,18 @@ void getPar(unsigned char* buff,  char* par){
 }
 
 
+//Checks if cmd correspond to any of the valid commands defined 
+//in VALID_COMMANDS
+int validCommand(char* cmd){
+	int i;
+	int size = sizeof VALID_COMMANDS/ sizeof (char*);
+	for(i=0; i<size;i++){
+		//printf("Comparing %s to %s...\n",cmd,VALID_COMMANDS[i]);
+		if(compareText(cmd,(char*) VALID_COMMANDS[i])) return 1;
+	}	
+	return 0;
+}
+
 //Main program
 int main(void) {
 	int receivedBytes;//, sentBytes;
@@ -234,6 +246,11 @@ int main(void) {
 
 			getCmd(inBuff,cmd);
 			getPar(inBuff,par);
+			
+			if(!validCommand(cmd)){
+				printf("Invalid Command: %s\n",cmd);
+				continue;
+			}
 			
 			if(compareText(cmd,"Debug")){
 				printf("cmd: %s\n",cmd);
