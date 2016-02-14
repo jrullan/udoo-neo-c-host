@@ -40,7 +40,7 @@
 #define PARS_SIZE 24	// Max size of characters in each parameter
 
 const char* VALID_COMMANDS[] = {
-	"Database","Debug","Email","HTTPRequest","SetEmail","Shell"
+	"Database","Debug","Email","HTTPRequest","Log"
 };
 
 //Array for parameters comming from arduino
@@ -303,6 +303,17 @@ int main(void) {
 				//printf("%s ",par);
 				//printf("%s\n",ctime(&now));	
 			}
+
+			if(compareText(cmd,"Log")){
+				if(pars < 1){
+					printf("Error: No message sent\n");
+					continue;
+				}
+				FILE* fp;
+				fp = fopen("/home/udooer/udoo_host_log.txt","a");
+				fprintf(fp,"%s %s",PARAMETERS[0],ctime(&now));
+				fclose(fp);			
+			}
 			
 			if(compareText(cmd,"Email")){
 				int status;
@@ -330,16 +341,12 @@ int main(void) {
 				fp = fopen("/home/udooer/mail.txt","w+");
 				
 				//2. Write To, From, Subject and Contents
-				/*if(stringSize(email)==0){
-					appendString(email,"To: jerullan@gmail.com\n");
-				}*/
-				//clearString(email);
 				fputs((char*)email,fp);
 				fputs("From: udooneo@udooneo.com\n",fp);
-				//fputs("Subject: NEO Security Alert\n",fp);
 				fputs((char*)subject,fp);
 				fputs("\n",fp);
-				fprintf(fp,"%s %s\n",PARAMETERS[2],ctime(&now));
+				fprintf(fp,"%s\n",PARAMETERS[2]);
+				fprintf(fp,"%s\n",ctime(&now));
 				fputs("\n",fp);
 				fputs("Message sent by Udoo Neo.\n",fp);
 				fputs("=========================\n",fp);
