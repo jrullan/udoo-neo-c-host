@@ -40,7 +40,7 @@
 #define PARS_SIZE 24	// Max size of characters in each parameter
 
 const char* VALID_COMMANDS[] = {
-	"Database","Debug","Email","HTTPRequest","Log"
+	"Database","Debug","Email","HTTPRequest","Log","Webcam"
 };
 
 //Array for parameters comming from arduino
@@ -376,6 +376,31 @@ void *emailFunc(void *arg){
 	pthread_exit(NULL);
 }
 
+//Webcam function to be called in a "detached" thread
+void *webcamFunc(void *arg){
+	printf("============================\nIn debug thread:\n");
+	struct commandStructure *command = (commandStructure *) arg;
+	char cmd[PARS_SIZE];
+	char message[PARS_SIZE];
+	time_t now = time(NULL);
+	int status;
+	
+	//Copy command info locally
+	strcpy(cmd,(const char*) command->cmd);
+	strcpy(message,(const char*) command->par[0]);
+	
+	status = system("streamer -c /dev/video1 -s 640x480 -o ~/capture.jpeg");
+	if(status == -1){
+		printf("Error: Could not take picture from webcam\n");
+	}else{
+		printf("Picture taken successfully!\n");
+	}
+	printf("cmd: %s\n",cmd);
+	printf("par: %s\n",message);
+	printf("time: %s\n",ctime(&now));
+	
+	pthread_exit(NULL);
+}
 //---------------------------------------------------------------------
 // MAIN PROGRAM
 //---------------------------------------------------------------------
@@ -394,6 +419,7 @@ int main(void) {
 	pthread_t logThread;
 	pthread_t emailThread;
 	pthread_t debugThread;
+	pthread_t webcamThread;
 	
 	// Open serial file descriptor
 	int fd = openSerial();
@@ -412,10 +438,10 @@ int main(void) {
 				printf("Invalid Command: %s\n\n",cmd);
 				continue;
 			}else{	
-				printf("Command: %s\n",cmd);
-				int i = 0;
-				printf("Parameters found: %d\n",pars);
-				for(i=0;i<pars;i++) printf("Parameter %d - %s\n",i,PARAMETERS[i]);			
+				//printf("Command: %s\n",cmd);
+				//int i = 0;
+				//printf("Parameters found: %d\n",pars);
+				//for(i=0;i<pars;i++) printf("Parameter %d - %s\n",i,PARAMETERS[i]);			
 			}
 			
 			if(compareText(cmd,"Debug")){ //thread is detached so resources can be recycled.
@@ -479,7 +505,23 @@ int main(void) {
 				
 				pthread_attr_destroy(&attr);
 			}
+			
+			if(compareText(cmd,"Webcam")){
+				command.cmd = cmd;
+				command.par[0] = PARAMETERS[0];
+
+				//=======Call debugFunc in thread======
+				int rc;
+				pthread_attr_t attr;
+				pthread_attr_init(&attr);
+				pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
 				
+				if((rc = pthread_create(&webcamThread,&attr,webcamFunc,&command))){
+					fprintf(stderr,"Error: Could not create webcam thread: %d\n",rc);
+				}
+				
+				pthread_attr_destroy(&attr);				
+			}
 
 		}else if(receivedBytes == 0){				//No data yet! go back to loop
 			continue;					
