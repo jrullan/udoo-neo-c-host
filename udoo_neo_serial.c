@@ -264,24 +264,117 @@ int parseParameters(char* par){
 // MULTI THREADING SECTION
 //---------------------------------------------------------------------
 
+//Structure to pass command and parameters info to functions in threads
 typedef struct commandStructure{
 	char* cmd;
-	char* par;
-	time_t* now;
+	char* par[PARS];
 } commandStructure;
 
-void *debugFunc(void *arg)
-{
-	struct commandStructure *command = (commandStructure *) arg;
-	
+//Debug function to be called in a "detached" thread
+void *debugFunc(void *arg){
 	printf("============================\nIn debug thread:\n");
-	printf("cmd: %s\n",command->cmd);
-	printf("par: %s\n",command->par);
-	printf("time: %s\n",ctime(command->now));	
-
-	return NULL;
+	struct commandStructure *command = (commandStructure *) arg;
+	char cmd[PARS_SIZE];
+	char message[PARS_SIZE];
+	time_t now = time(NULL);
+	
+	//Copy command info locally
+	strcpy(cmd,(const char*) command->cmd);
+	strcpy(message,(const char*) command->par[0]);
+	
+	printf("cmd: %s\n",cmd);
+	printf("par: %s\n",message);
+	printf("time: %s\n",ctime(&now));
+	
+	pthread_exit(NULL);
 }
 
+//Log function to be called in a "detached" thread
+void *logFunc(void *arg){
+	printf("============================\nIn log thread:\n");
+	struct commandStructure *command = (commandStructure *) arg;
+	char cmd[PARS_SIZE];
+	char message[PARS_SIZE];
+	time_t now = time(NULL);	
+	
+	//Copy command info locally
+	strcpy(cmd,(const char*) command->cmd);
+	strcpy(message,(const char*) command->par[0]);
+
+	FILE* fp;
+	fp = fopen("/home/udooer/udoo_host_log.txt","a");
+	fprintf(fp,"%s %s",message,ctime(&now));
+	fclose(fp);	
+
+	pthread_exit(NULL);
+}
+
+//Email function to be called in a "detached" thread
+void *emailFunc(void *arg){
+	printf("============================\nIn email thread:\n");
+	struct commandStructure *command = (commandStructure *) arg;
+	char cmd[PARS_SIZE];
+	char emailAddress[PARS_SIZE];
+	char emailSubject[PARS_SIZE];
+	char emailMessage[PARS_SIZE];
+	time_t now = time(NULL);
+	
+	//Copy command info locally
+	strcpy(cmd,(const char*) command->cmd);
+	strcpy(emailAddress,(const char*) command->par[0]);
+	strcpy(emailSubject,(const char*) command->par[1]);
+	strcpy(emailMessage,(const char*) command->par[2]);
+
+	int status;
+	char* email[stringSize(emailAddress)+5];
+	char* subject[stringSize(emailSubject)+10];
+	
+	clearString((char*)email);
+	appendString((char*)email,"To: ");
+	appendString((char*)email,emailAddress);
+	appendString((char*)email,"\n");				
+	
+	clearString((char*)subject);
+	appendString((char*)subject,"Subject: ");
+	appendString((char*)subject,emailSubject);
+	appendString((char*)subject,"\n");				
+
+	//1. Open email file
+	FILE* fp;
+	fp = fopen("/home/udooer/mail.txt","w+");
+	
+	//2. Write To, From, Subject and Contents
+	fputs((char*)email,fp);
+	fputs("From: udooneo@udooneo.com\n",fp);
+	fputs((char*)subject,fp);
+	fputs("\n",fp);
+	fprintf(fp,"%s\n",emailMessage);
+	fprintf(fp,"%s\n",ctime(&now));
+	fputs("\n",fp);
+	fputs("Message sent by Udoo Neo.\n",fp);
+	fputs("=========================\n",fp);
+	fputs("\n",fp);
+
+	//3. Close file
+	fclose(fp);
+	status = system("cat ~/mail.txt");
+	if(status == -1) printf("Error: could not execute command\n");
+	
+	//4. send email
+	char ssmtpCommand[40];
+	strcpy(ssmtpCommand, "ssmtp ");
+	appendString((char*) ssmtpCommand, emailAddress);
+	strcat(ssmtpCommand, " < ~/mail.txt");
+	printf("Command to execute: %s\n",ssmtpCommand);
+	status = system(ssmtpCommand);
+	if(status == -1){ 
+		printf("Error: could not send email\n");
+	}else{
+		printf("Email sent successfully! on %s\n",ctime(&now));
+	}
+	
+	pthread_exit(NULL);
+}
 
 //---------------------------------------------------------------------
 // MAIN PROGRAM
@@ -298,8 +391,8 @@ int main(void) {
 	struct commandStructure command;
 	
 	//Threads variables
-	//pthread_t logThread;
-	//pthread_t emailThread;
+	pthread_t logThread;
+	pthread_t emailThread;
 	pthread_t debugThread;
 	
 	// Open serial file descriptor
@@ -310,29 +403,26 @@ int main(void) {
 		receivedBytes = read(fd,inBuff,BUFFER_MAX);
 		if(receivedBytes > 0){						// Data found!
 			printf("\nPayload size: %d\n",receivedBytes);
-			
-			time_t now = time(NULL); // timestamp
 
 			getCmd(inBuff,cmd);
+			getPar(inBuff,par);
+			int pars = parseParameters(par);
+			
 			if(!validCommand(cmd)){
 				printf("Invalid Command: %s\n\n",cmd);
 				continue;
+			}else{	
+				printf("Command: %s\n",cmd);
+				int i = 0;
+				printf("Parameters found: %d\n",pars);
+				for(i=0;i<pars;i++) printf("Parameter %d - %s\n",i,PARAMETERS[i]);			
 			}
 			
-			printf("Command: %s\n",cmd);
-			getPar(inBuff,par);
-			int pars = parseParameters(par);
-			int i = 0;
-			printf("Parameters found: %d\n",pars);
-			for(i=0;i<pars;i++) printf("Parameter %d - %s\n",i,PARAMETERS[i]);			
-			
-			
-			// Multithreading code:
-			command.cmd = cmd;
-			command.par = par;
-			command.now = &now;
-			
-			if(compareText(cmd,"Debug")){
+			if(compareText(cmd,"Debug")){ //thread is detached so resources can be recycled.
+				command.cmd = cmd;
+				command.par[0] = PARAMETERS[0];
+
+				//=======Call debugFunc in thread======
 				int rc;
 				pthread_attr_t attr;
 				pthread_attr_init(&attr);
@@ -350,67 +440,44 @@ int main(void) {
 					printf("Error: No message sent\n");
 					continue;
 				}
-				FILE* fp;
-				fp = fopen("/home/udooer/udoo_host_log.txt","a");
-				fprintf(fp,"%s %s",PARAMETERS[0],ctime(&now));
-				fclose(fp);			
+				command.cmd = cmd;
+				command.par[0] = PARAMETERS[0];
+
+				//=======Call logFunc in thread======
+				int rc;
+				pthread_attr_t attr;
+				pthread_attr_init(&attr);
+				pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
+				
+				if((rc = pthread_create(&logThread,&attr,logFunc,&command))){
+					fprintf(stderr,"Error: Could not create thread: %d\n",rc);
+				}
+				
+				pthread_attr_destroy(&attr);
 			}
 			
 			if(compareText(cmd,"Email")){
-				int status;
-				
 				if(pars < 3){  //Need at least the email address and a subject
 					printf("Error: Need 3 parameters: address, subject and message\n");
 					continue;
 				}
-
-				char* email[stringSize(PARAMETERS[0])+5];
-				char* subject[stringSize(PARAMETERS[1])+10];
 				
-				clearString((char*)email);
-				appendString((char*)email,"To: ");
-				appendString((char*)email,PARAMETERS[0]);
-				appendString((char*)email,"\n");				
+				command.cmd = cmd;
+				command.par[0] = PARAMETERS[0];
+				command.par[1] = PARAMETERS[1];
+				command.par[2] = PARAMETERS[2];
 				
-				clearString((char*)subject);
-				appendString((char*)subject,"Subject: ");
-				appendString((char*)subject,PARAMETERS[1]);
-				appendString((char*)subject,"\n");				
-
-				//1. Open email file
-				FILE* fp;
-				fp = fopen("/home/udooer/mail.txt","w+");
+				//=======Call logFunc in thread======
+				int rc;
+				pthread_attr_t attr;
+				pthread_attr_init(&attr);
+				pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
 				
-				//2. Write To, From, Subject and Contents
-				fputs((char*)email,fp);
-				fputs("From: udooneo@udooneo.com\n",fp);
-				fputs((char*)subject,fp);
-				fputs("\n",fp);
-				fprintf(fp,"%s\n",PARAMETERS[2]);
-				fprintf(fp,"%s\n",ctime(&now));
-				fputs("\n",fp);
-				fputs("Message sent by Udoo Neo.\n",fp);
-				fputs("=========================\n",fp);
-				fputs("\n",fp);
-
-				//3. Close file
-				fclose(fp);
-				status = system("cat ~/mail.txt");
-				if(status == -1) printf("Error: could not execute command\n");
-				
-				//4. send email
-				char ssmtpCommand[40];
-				strcpy(ssmtpCommand, "ssmtp ");
-				appendString((char*) ssmtpCommand, PARAMETERS[0]);
-				strcat(ssmtpCommand, " < ~/mail.txt");
-				printf("Command to execute: %s\n",ssmtpCommand);
-				status = system(ssmtpCommand);
-				if(status == -1){ 
-					printf("Error: could not send email\n");
-				}else{
-					printf("Email sent successfully! on %s\n",ctime(&now));
+				if((rc = pthread_create(&emailThread,&attr,emailFunc,&command))){
+					fprintf(stderr,"Error: Could not create thread: %d\n",rc);
 				}
 				
+				pthread_attr_destroy(&attr);
 			}
 				
 
