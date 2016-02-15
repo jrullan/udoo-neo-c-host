@@ -378,29 +378,47 @@ void *emailFunc(void *arg){
 
 //Webcam function to be called in a "detached" thread
 void *webcamFunc(void *arg){
-	printf("============================\nIn debug thread:\n");
+	printf("============================\nIn webcam thread:\n");
 	struct commandStructure *command = (commandStructure *) arg;
 	char cmd[PARS_SIZE];
 	char message[PARS_SIZE];
-	time_t now = time(NULL);
+	char streamerCommand[100];
+	//time_t now = time(NULL);
 	int status;
 	
 	//Copy command info locally
 	strcpy(cmd,(const char*) command->cmd);
 	strcpy(message,(const char*) command->par[0]);
+	strcpy(streamerCommand, "streamer -w 2 -t 2 -j 85 -c /dev/video1 -s 640x480 -o ~/");
+	//strcat(streamerCommand, (const char*) message);
+	strcat(streamerCommand,"capture00.jpeg");
 	
-	status = system("streamer -c /dev/video1 -s 640x480 -o ~/capture.jpeg");
+	//status = system("streamer -w 2 -j 85 -c /dev/video1 -s 640x480 -o ~/capture.jpeg");
+	status = system(streamerCommand);
 	if(status == -1){
-		printf("Error: Could not take picture from webcam\n");
+		printf("Error: Could not take picture from webcam. Command %s\n",streamerCommand);
 	}else{
-		printf("Picture taken successfully!\n");
+		printf("Picture taken successfully!\n%c",'\0');
 	}
-	printf("cmd: %s\n",cmd);
-	printf("par: %s\n",message);
-	printf("time: %s\n",ctime(&now));
+	//printf("cmd: %s\n",cmd);
+	//printf("par: %s\n",message);
+	//printf("time: %s\n",ctime(&now));
 	
 	pthread_exit(NULL);
 }
+
+//Initialize
+void init(){
+	//Clear buffer
+	unsigned char inBuff[BUFFER_MAX];
+	int fd = openSerial();
+	int receivedBytes;
+	while( (receivedBytes = read(fd,inBuff,BUFFER_MAX)) ){
+		if(receivedBytes) printf("Emptied buffer of %d bytes\n",receivedBytes);
+	}
+	close(fd);
+}
+
 //---------------------------------------------------------------------
 // MAIN PROGRAM
 //---------------------------------------------------------------------
@@ -420,6 +438,9 @@ int main(void) {
 	pthread_t emailThread;
 	pthread_t debugThread;
 	pthread_t webcamThread;
+	
+	//Empty buffers
+	init();
 	
 	// Open serial file descriptor
 	int fd = openSerial();
