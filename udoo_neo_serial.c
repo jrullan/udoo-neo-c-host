@@ -259,15 +259,48 @@ int parseParameters(char* par){
 	return number+1; // Number of parameters found
 }
 
+
+//---------------------------------------------------------------------
+// MULTI THREADING SECTION
+//---------------------------------------------------------------------
+
+typedef struct commandStructure{
+	char* cmd;
+	char* par;
+	time_t* now;
+} commandStructure;
+
+void *debugFunc(void *arg)
+{
+	struct commandStructure *command = (commandStructure *) arg;
+	
+	printf("============================\nIn debug thread:\n");
+	printf("cmd: %s\n",command->cmd);
+	printf("par: %s\n",command->par);
+	printf("time: %s\n",ctime(command->now));	
+
+	return NULL;
+}
+
+
+//---------------------------------------------------------------------
+// MAIN PROGRAM
+//---------------------------------------------------------------------
+
 //Main program
 int main(void) {
 	int receivedBytes;//, sentBytes;
 	//unsigned char outBuff[BUFFER_MAX];
 	unsigned char inBuff[BUFFER_MAX];
 	//Reserve memory
-	//char* email = malloc(BUFFER_MAX * sizeof(char));
 	char* cmd = malloc((BUFFER_MAX+1) * sizeof(char));
 	char* par = malloc((BUFFER_MAX+1) * sizeof(char));
+	struct commandStructure command;
+	
+	//Threads variables
+	//pthread_t logThread;
+	//pthread_t emailThread;
+	pthread_t debugThread;
 	
 	// Open serial file descriptor
 	int fd = openSerial();
@@ -293,15 +326,23 @@ int main(void) {
 			printf("Parameters found: %d\n",pars);
 			for(i=0;i<pars;i++) printf("Parameter %d - %s\n",i,PARAMETERS[i]);			
 			
-			//continue;
+			
+			// Multithreading code:
+			command.cmd = cmd;
+			command.par = par;
+			command.now = &now;
 			
 			if(compareText(cmd,"Debug")){
-				printf("cmd: %s\n",cmd);
-				printf("par: %s\n",par);
-				printf("time: %s\n",ctime(&now));
-				//time_t now = time(NULL);
-				//printf("%s ",par);
-				//printf("%s\n",ctime(&now));	
+				int rc;
+				pthread_attr_t attr;
+				pthread_attr_init(&attr);
+				pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
+				
+				if((rc = pthread_create(&debugThread,&attr,debugFunc,&command))){
+					fprintf(stderr,"Error: Could not create thread: %d\n",rc);
+				}
+				
+				pthread_attr_destroy(&attr);
 			}
 
 			if(compareText(cmd,"Log")){
@@ -387,7 +428,7 @@ int main(void) {
 	//Free reserved memory
 	free((void*)cmd);
 	free((void*)par);
-	//free((void*)email);
+
 	//Close serial's file descriptor
 	close(fd);	
 }
