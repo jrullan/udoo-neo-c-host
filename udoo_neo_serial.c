@@ -40,7 +40,7 @@
 #define PARS_SIZE 24	// Max size of characters in each parameter
 
 const char* VALID_COMMANDS[] = {
-	"Database","Debug","Email","HTTPRequest","Log","Webcam"
+	"Database","Debug","Email","HTTPRequest","Log","Webcam","EmailPhoto"
 };
 
 //Array for parameters comming from arduino
@@ -383,29 +383,107 @@ void *webcamFunc(void *arg){
 	char cmd[PARS_SIZE];
 	char message[PARS_SIZE];
 	char streamerCommand[100];
-	//time_t now = time(NULL);
+	time_t now = time(NULL);
 	int status;
 	
 	//Copy command info locally
 	strcpy(cmd,(const char*) command->cmd);
 	strcpy(message,(const char*) command->par[0]);
-	strcpy(streamerCommand, "streamer -w 2 -t 2 -j 85 -c /dev/video1 -s 640x480 -o ~/");
-	//strcat(streamerCommand, (const char*) message);
+	strcpy(streamerCommand, "streamer -q -w 2 -t 2 -j 85 -c /dev/video1 -s 640x480 -o ~/");
 	strcat(streamerCommand,"capture00.jpeg");
 	
-	//status = system("streamer -w 2 -j 85 -c /dev/video1 -s 640x480 -o ~/capture.jpeg");
+	printf("cmd: %s\n",cmd);
+	printf("par: %s\n",message);
 	status = system(streamerCommand);
 	if(status == -1){
 		printf("Error: Could not take picture from webcam. Command %s\n",streamerCommand);
 	}else{
 		printf("Picture taken successfully!\n%c",'\0');
 	}
-	//printf("cmd: %s\n",cmd);
-	//printf("par: %s\n",message);
-	//printf("time: %s\n",ctime(&now));
+	printf("time: %s\n",ctime(&now));
 	
 	pthread_exit(NULL);
 }
+
+//Send email with attachment photo taken from Webcam
+void *emailPhotoFunc(void *arg){
+	printf("============================\nIn emailPhoto thread:\n");
+	struct commandStructure *command = (commandStructure *) arg;
+	char cmd[PARS_SIZE];
+	//char message[PARS_SIZE];
+	char emailAddress[PARS_SIZE];
+	char emailSubject[PARS_SIZE];
+	char emailMessage[PARS_SIZE];	
+	char streamerCommand[100];
+	time_t now = time(NULL);
+	int status;
+		
+	//Copy command info locally
+	strcpy(cmd,(const char*) command->cmd);
+	strcpy(emailAddress,(const char*) command->par[0]);
+	strcpy(emailSubject,(const char*) command->par[1]);
+	strcpy(emailMessage,(const char*) command->par[2]);
+	
+	//Create streamer command to take a photo from webcam
+	strcpy(streamerCommand, "streamer -q -w 2 -t 2 -j 85 -c /dev/video1 -s 640x480 -o ~/capture00.jpeg");
+	status = system(streamerCommand);
+	if(status == -1){
+		printf("Error: Could not take picture from webcam. Command %s\n",streamerCommand);
+		pthread_exit(NULL);
+	}else{
+		printf("Picture taken successfully!\n");
+	}
+	
+	//Email command
+	char* email[stringSize(emailAddress)+5];
+	char* subject[stringSize(emailSubject)+10];
+	
+	clearString((char*)email);
+	appendString((char*)email,"To: ");
+	appendString((char*)email,emailAddress);
+	appendString((char*)email,"\n");				
+	
+	clearString((char*)subject);
+	appendString((char*)subject,"Subject: ");
+	appendString((char*)subject,emailSubject);
+	appendString((char*)subject,"\n");
+
+	//1. Open email file
+	FILE* fp;
+	fp = fopen("/home/udooer/mail.txt","w+");
+	
+	//2. Write To, From, Subject and Contents
+	fputs((char*)email,fp);
+	fputs("From: udooneo@udooneo.com\n",fp);
+	fputs((char*)subject,fp);
+	fputs("\n",fp);
+	fprintf(fp,"%s\n",emailMessage);
+	fprintf(fp,"%s\n",ctime(&now));
+	fputs("\n",fp);
+	fputs("Message sent by Udoo Neo.\n",fp);
+	fputs("=========================\n",fp);
+	fputs("\n",fp);
+
+	//3. Close file
+	fclose(fp);
+	
+	char mpackCommand[100];
+	strcpy(mpackCommand,"mpack -s \"");
+	strcat(mpackCommand,(const char*) emailSubject);
+	strcat(mpackCommand, "\" -d ~/mail.txt ~/capture01.jpeg ");
+	strcat(mpackCommand, emailAddress);
+	printf("Command to execute: %s\n",mpackCommand);
+	status = system(mpackCommand);
+	if(status == -1){ 
+		printf("Error: could not send email\n");
+	}else{
+		printf("Email sent successfully! on %s\n",ctime(&now));
+	}	
+
+	printf("%s\n",ctime(&now));
+	pthread_exit(NULL);	
+}
+
 
 //Initialize
 void init(){
@@ -438,6 +516,7 @@ int main(void) {
 	pthread_t emailThread;
 	pthread_t debugThread;
 	pthread_t webcamThread;
+	pthread_t emailPhotoThread;
 	
 	//Empty buffers
 	init();
@@ -544,6 +623,25 @@ int main(void) {
 				pthread_attr_destroy(&attr);				
 			}
 
+			if(compareText(cmd,"EmailPhoto")){
+				command.cmd = cmd;
+				command.par[0] = PARAMETERS[0];
+				command.par[1] = PARAMETERS[1];
+				command.par[2] = PARAMETERS[2];
+
+				//=======Call debugFunc in thread======
+				int rc;
+				pthread_attr_t attr;
+				pthread_attr_init(&attr);
+				pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
+				
+				if((rc = pthread_create(&emailPhotoThread,&attr,emailPhotoFunc,&command))){
+					fprintf(stderr,"Error: Could not create emailPhoto thread: %d\n",rc);
+				}
+				
+				pthread_attr_destroy(&attr);
+			}
+			
 		}else if(receivedBytes == 0){				//No data yet! go back to loop
 			continue;					
 		}else if(receivedBytes < 0){				//Error reading, exit.
