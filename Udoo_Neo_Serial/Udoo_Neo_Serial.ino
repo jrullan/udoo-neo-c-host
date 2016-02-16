@@ -13,13 +13,21 @@
 #define BUFFER_MAX 64
 #define PIR 4
 #define LED1 13
+#define MAX_TRIGGERS 10
 
 byte buff[BUFFER_MAX];
 unsigned char *intToStr;
 boolean motionDetected = false;
-long emailDelay = 60000;
-long emailAcc = 0;
-int l = 0;
+int counter = 0;
+
+typedef struct myTimer{
+  long time;
+  long last;
+  boolean done;
+};
+
+struct myTimer timer1 { .time = 2000, .last = 0, .done = false};
+struct myTimer emailDelay { .time = 60000, .last = 0, .done = false};
 
 void setup() {
   Serial.begin(115200);
@@ -40,20 +48,29 @@ void loop() {
   */
   
   if(digitalRead(PIR)==HIGH){
+
     if(!motionDetected){         // One Shot
+      sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
       digitalWrite(LED1,HIGH);
-      if(done(emailDelay,&emailAcc)){ 
-        //sendCommand(":Debug",emailAcc);
-        //sendCommand(":Debug","jerullan@gmail.com");
-        sendCommand(":SetEmail","jerullan@gmail.com");
-        //sendCommand(":SetEmail","jerullan@yahoo.com");
-        sendCommand(":Email","Motion Detected");
-      }
+      motionDetected = true;
+      resetTimer(&emailDelay);
     }
-    motionDetected = true;
+    
+    if(timerDone(&timer1)){     
+      counter++;
+      String message = "Motion Detected ";
+      message += (millis()-emailDelay.last);
+      sendCommand(":Debug",message);
+      resetTimer(&timer1);
+    }
+    
   }else{
     digitalWrite(LED1,LOW);
-    motionDetected = false;
+    if(timerDone(&emailDelay)){
+      motionDetected = false;
+    }
+    counter = 0;
+    resetTimer(&timer1);
   }
 
 }
@@ -120,12 +137,18 @@ void sendCommand(String cmd, String par){
   delay(100);  
 }
 
-// Timer utility
-boolean done(long timeDelay, long* accumulated){
-  if(millis()-*accumulated > timeDelay){
-    *accumulated = millis();
+// Timer utilities functions
+
+boolean timerDone(struct myTimer* timer){
+  if( (millis()-timer->last) > timer->time){
+    timer->done = true;
     return true;
   }
   return false;
+}
+
+void resetTimer(struct myTimer* timer){
+  timer->last = millis();
+  timer->done = false;
 }
 
