@@ -38,6 +38,7 @@
 						
 #define PARS 10			// Max parameters to hold
 #define PARS_SIZE 24	// Max size of characters in each parameter
+#define DEBUG 0
 
 const char* VALID_COMMANDS[] = {
 	"Database","Debug","Email","HTTPRequest","Log","Webcam","EmailPhoto"
@@ -272,7 +273,6 @@ typedef struct commandStructure{
 
 //Debug function to be called in a "detached" thread
 void *debugFunc(void *arg){
-	printf("============================\nIn debug thread:\n");
 	struct commandStructure *command = (commandStructure *) arg;
 	char cmd[PARS_SIZE];
 	char message[PARS_SIZE];
@@ -282,16 +282,20 @@ void *debugFunc(void *arg){
 	strcpy(cmd,(const char*) command->cmd);
 	strcpy(message,(const char*) command->par[0]);
 	
-	printf("cmd: %s\n",cmd);
-	printf("par: %s\n",message);
-	printf("time: %s\n",ctime(&now));
+	if(DEBUG){
+		printf("============================\nIn debug thread:\n");
+		printf("cmd: %s\n",cmd);
+		printf("par: %s\n",message);
+		printf("time: %s",ctime(&now));
+	}
+	
+	printf("%s - %s",message,ctime(&now));
 	
 	pthread_exit(NULL);
 }
 
 //Log function to be called in a "detached" thread
 void *logFunc(void *arg){
-	printf("============================\nIn log thread:\n");
 	struct commandStructure *command = (commandStructure *) arg;
 	char cmd[PARS_SIZE];
 	char message[PARS_SIZE];
@@ -300,6 +304,13 @@ void *logFunc(void *arg){
 	//Copy command info locally
 	strcpy(cmd,(const char*) command->cmd);
 	strcpy(message,(const char*) command->par[0]);
+
+	if(DEBUG){
+		printf("============================\nIn log thread:\n");
+		printf("cmd: %s\n",cmd);
+		printf("par: %s\n",message);
+		printf("time: %s",ctime(&now));
+	}
 
 	FILE* fp;
 	fp = fopen("/home/udooer/udoo_host_log.txt","a");
@@ -311,13 +322,21 @@ void *logFunc(void *arg){
 
 //Email function to be called in a "detached" thread
 void *emailFunc(void *arg){
-	printf("============================\nIn email thread:\n");
 	struct commandStructure *command = (commandStructure *) arg;
 	char cmd[PARS_SIZE];
 	char emailAddress[PARS_SIZE];
 	char emailSubject[PARS_SIZE];
 	char emailMessage[PARS_SIZE];
 	time_t now = time(NULL);
+	
+	if(DEBUG){
+		printf("============================\nIn email thread:\n");
+		printf("cmd: %s\n",cmd);
+		printf("email: %s\n",emailAddress);
+		printf("subject: %s\n",emailSubject);
+		printf("message: %s\n",emailMessage);
+		printf("time: %s",ctime(&now));
+	}	
 	
 	//Copy command info locally
 	strcpy(cmd,(const char*) command->cmd);
@@ -378,7 +397,6 @@ void *emailFunc(void *arg){
 
 //Webcam function to be called in a "detached" thread
 void *webcamFunc(void *arg){
-	printf("============================\nIn webcam thread:\n");
 	struct commandStructure *command = (commandStructure *) arg;
 	char cmd[PARS_SIZE];
 	char message[PARS_SIZE];
@@ -391,23 +409,28 @@ void *webcamFunc(void *arg){
 	strcpy(message,(const char*) command->par[0]);
 	strcpy(streamerCommand, "streamer -q -w 2 -t 2 -j 85 -c /dev/video1 -s 640x480 -o ~/");
 	strcat(streamerCommand,"capture00.jpeg");
+
+	if(DEBUG){
+		printf("============================\nIn webcam thread:\n");
+		printf("cmd: %s\n",cmd);
+		printf("par: %s\n",message);
+		printf("time: %s",ctime(&now));
+	}
 	
-	printf("cmd: %s\n",cmd);
-	printf("par: %s\n",message);
 	status = system(streamerCommand);
 	if(status == -1){
 		printf("Error: Could not take picture from webcam. Command %s\n",streamerCommand);
 	}else{
 		printf("Picture taken successfully!\n%c",'\0');
 	}
-	printf("time: %s\n",ctime(&now));
+	
+	//printf("time: %s",ctime(&now));
 	
 	pthread_exit(NULL);
 }
 
 //Send email with attachment photo taken from Webcam
 void *emailPhotoFunc(void *arg){
-	printf("============================\nIn emailPhoto thread:\n");
 	struct commandStructure *command = (commandStructure *) arg;
 	char cmd[PARS_SIZE];
 	//char message[PARS_SIZE];
@@ -424,8 +447,17 @@ void *emailPhotoFunc(void *arg){
 	strcpy(emailSubject,(const char*) command->par[1]);
 	strcpy(emailMessage,(const char*) command->par[2]);
 	
+	if(DEBUG){
+		printf("============================\nIn emailPhoto thread:\n");
+		printf("cmd: %s\n",cmd);
+		printf("email: %s\n",emailAddress);
+		printf("subject: %s\n",emailSubject);
+		printf("message: %s\n",emailMessage);
+		printf("time: %s",ctime(&now));
+	}	
+	
 	//Create streamer command to take a photo from webcam
-	strcpy(streamerCommand, "streamer -q -w 2 -t 2 -j 85 -c /dev/video1 -s 640x480 -o ~/capture00.jpeg");
+	strcpy(streamerCommand, "streamer -q -w 2 -t 5 -j 85 -c /dev/video1 -s 640x480 -o ~/capture00.jpeg");
 	status = system(streamerCommand);
 	if(status == -1){
 		printf("Error: Could not take picture from webcam. Command %s\n",streamerCommand);
@@ -470,14 +502,16 @@ void *emailPhotoFunc(void *arg){
 	char mpackCommand[100];
 	strcpy(mpackCommand,"mpack -s \"");
 	strcat(mpackCommand,(const char*) emailSubject);
-	strcat(mpackCommand, "\" -d ~/mail.txt ~/capture01.jpeg ");
+	strcat(mpackCommand, "\" -d ~/mail.txt ~/capture04.jpeg ");
 	strcat(mpackCommand, emailAddress);
-	printf("Command to execute: %s\n",mpackCommand);
+	if(DEBUG) printf("Command to execute: %s\n",mpackCommand);
 	status = system(mpackCommand);
 	if(status == -1){ 
 		printf("Error: could not send email\n");
 	}else{
-		printf("Email sent successfully! on %s\n",ctime(&now));
+		printf("============================\nIn emailPhoto thread:\n");
+		printf("Email sent successfully! on %s",ctime(&now));
+		printf("============================\n");
 	}	
 
 	printf("%s\n",ctime(&now));
@@ -492,7 +526,7 @@ void init(){
 	int fd = openSerial();
 	int receivedBytes;
 	while( (receivedBytes = read(fd,inBuff,BUFFER_MAX)) ){
-		if(receivedBytes) printf("Emptied buffer of %d bytes\n",receivedBytes);
+		if(receivedBytes && DEBUG) printf("Emptied buffer of %d bytes\n",receivedBytes);
 	}
 	close(fd);
 }
@@ -528,7 +562,8 @@ int main(void) {
 	while(1){
 		receivedBytes = read(fd,inBuff,BUFFER_MAX);
 		if(receivedBytes > 0){						// Data found!
-			printf("\nPayload size: %d\n",receivedBytes);
+			
+			if(DEBUG) printf("\nPayload size: %d\n",receivedBytes);
 
 			getCmd(inBuff,cmd);
 			getPar(inBuff,par);

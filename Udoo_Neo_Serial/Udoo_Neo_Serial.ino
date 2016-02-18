@@ -48,15 +48,15 @@ void loop() {
   */
   
   if(digitalRead(PIR)==HIGH){
-
-    if(!motionDetected){         // One Shot
-      sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
-      digitalWrite(LED1,HIGH);
-      motionDetected = true;
-      resetTimer(&emailDelay);
-    }
     
-    if(timerDone(&timer1)){     
+    if(timerDone(&timer1)){ 
+      if(!motionDetected){         // One Shot
+        sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
+        digitalWrite(LED1,HIGH);
+        motionDetected = true;
+        resetTimer(&emailDelay);
+      }
+      
       counter++;
       String message = "Motion Detected ";
       message += (millis()-emailDelay.last);
