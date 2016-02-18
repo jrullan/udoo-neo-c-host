@@ -26,7 +26,7 @@ typedef struct myTimer{
   boolean done;
 };
 
-struct myTimer timer1 { .time = 2000, .last = 0, .done = false};
+struct myTimer timer1 { .time = 5000, .last = 0, .done = false};
 struct myTimer emailDelay { .time = 60000, .last = 0, .done = false};
 
 void setup() {
@@ -48,15 +48,16 @@ void loop() {
   */
   
   if(digitalRead(PIR)==HIGH){
-
-    if(!motionDetected){         // One Shot
-      sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
-      digitalWrite(LED1,HIGH);
-      motionDetected = true;
-      resetTimer(&emailDelay);
-    }
+    digitalWrite(LED1,HIGH);    
     
-    if(timerDone(&timer1)){     
+    if(timerDone(&timer1)){ 
+      if(!motionDetected){         // One Shot
+        //sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
+        sendCommand(":Debug","Taking photo");
+        motionDetected = true;
+        resetTimer(&emailDelay);
+      }
+  
       counter++;
       String message = "Motion Detected ";
       message += (millis()-emailDelay.last);
