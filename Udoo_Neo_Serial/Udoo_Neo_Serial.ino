@@ -33,12 +33,15 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIR,INPUT);
   pinMode(LED1,OUTPUT);
+  timer1.time = 2000;
+  emailDelay.time = 60000;
   intToStr = (unsigned char*) malloc (sizeof(int)/sizeof(unsigned char));
   if(intToStr != NULL) memset(&intToStr,0,sizeof(int)/sizeof(unsigned char));
   memset(&buff,0,BUFFER_MAX);
 }
 
 void loop() {
+  
   /*
   if(Serial.available()>0){
     byte bytes = readSerial(buff);
@@ -49,17 +52,16 @@ void loop() {
   
   if(digitalRead(PIR)==HIGH){
     digitalWrite(LED1,HIGH);    
+
+    if(!motionDetected){         // One Shot
+      sendCommand(":Debug","Taking photo");
+      //sendCommand(":Webcam","foto00.jpeg");
+      sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
+      motionDetected = true;
+      resetTimer(&emailDelay);
+    }
     
     if(timerDone(&timer1)){ 
-      
-      if(!motionDetected){         // One Shot
-        sendCommand(":Debug","Taking photo");
-        sendCommand(":Webcam","capture00.jpeg");
-        //sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
-        motionDetected = true;
-        resetTimer(&emailDelay);
-      }
-  
       String message = "Motion Detected ";
       message += (millis()-emailDelay.last)/1000;
       sendCommand(":Debug",message);
