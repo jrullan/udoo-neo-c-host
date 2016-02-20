@@ -407,8 +407,8 @@ void *webcamFunc(void *arg){
 	//Copy command info locally
 	strcpy(cmd,(const char*) command->cmd);
 	strcpy(message,(const char*) command->par[0]);
-	strcpy(streamerCommand, "streamer -q -w 2 -t 2 -j 85 -c /dev/video1 -s 640x480 -o ~/");
-	strcat(streamerCommand,"capture00.jpeg");
+	strcpy(streamerCommand, "streamer -q -w 0 -t 5 -j 85 -c /dev/video1 -s 640x480 -o ~/");
+	strcat(streamerCommand,message);
 
 	if(DEBUG){
 		printf("============================\nIn webcam thread:\n");
@@ -457,13 +457,13 @@ void *emailPhotoFunc(void *arg){
 	}	
 	
 	//Create streamer command to take a photo from webcam
-	strcpy(streamerCommand, "streamer -q -w 2 -t 5 -j 85 -c /dev/video1 -s 640x480 -o ~/capture00.jpeg");
+	strcpy(streamerCommand, "streamer -q -w 0 -t 5 -j 85 -c /dev/video1 -s 640x480 -o ~/capture00.jpeg");
 	status = system(streamerCommand);
 	if(status == -1){
-		printf("Error: Could not take picture from webcam. Command %s\n",streamerCommand);
+		printf("==Error: Could not take picture from webcam. Command %s\n",streamerCommand);
 		pthread_exit(NULL);
 	}else{
-		printf("Picture taken successfully!\n");
+		printf("==Picture taken successfully!\n");
 	}
 	
 	//Email command
@@ -507,14 +507,14 @@ void *emailPhotoFunc(void *arg){
 	if(DEBUG) printf("Command to execute: %s\n",mpackCommand);
 	status = system(mpackCommand);
 	if(status == -1){ 
-		printf("Error: could not send email\n");
+		printf("==Error: could not send email\n");
 	}else{
-		printf("============================\nIn emailPhoto thread:\n");
-		printf("Email sent successfully! on %s",ctime(&now));
-		printf("============================\n");
+		//printf("  ============================\nIn emailPhoto thread:\n");
+		printf("==Email sent successfully! on %s",ctime(&now));
+		//printf("  ============================\n");
 	}	
 
-	printf("%s\n",ctime(&now));
+	//printf("%s\n",ctime(&now));
 	pthread_exit(NULL);	
 }
 
