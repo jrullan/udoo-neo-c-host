@@ -18,7 +18,7 @@
 byte buff[BUFFER_MAX];
 unsigned char *intToStr;
 boolean motionDetected = false;
-int counter = 0;
+
 
 typedef struct myTimer{
   long time;
@@ -26,7 +26,7 @@ typedef struct myTimer{
   boolean done;
 };
 
-struct myTimer timer1 { .time = 2000, .last = 0, .done = false};
+struct myTimer timer1 { .time = 5000, .last = 0, .done = false};
 struct myTimer emailDelay { .time = 60000, .last = 0, .done = false};
 
 void setup() {
@@ -48,18 +48,20 @@ void loop() {
   */
   
   if(digitalRead(PIR)==HIGH){
+    digitalWrite(LED1,HIGH);    
     
     if(timerDone(&timer1)){ 
+      
       if(!motionDetected){         // One Shot
-        sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
-        digitalWrite(LED1,HIGH);
+        sendCommand(":Debug","Taking photo");
+        sendCommand(":Webcam","capture00.jpeg");
+        //sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
         motionDetected = true;
         resetTimer(&emailDelay);
       }
-      
-      counter++;
+  
       String message = "Motion Detected ";
-      message += (millis()-emailDelay.last);
+      message += (millis()-emailDelay.last)/1000;
       sendCommand(":Debug",message);
       resetTimer(&timer1);
     }
@@ -69,7 +71,6 @@ void loop() {
     if(timerDone(&emailDelay)){
       motionDetected = false;
     }
-    counter = 0;
     resetTimer(&timer1);
   }
 
@@ -140,7 +141,7 @@ void sendCommand(String cmd, String par){
 // Timer utilities functions
 
 boolean timerDone(struct myTimer* timer){
-  if( (millis()-timer->last) > timer->time){
+  if( (millis()-timer->last) >= timer->time){
     timer->done = true;
     return true;
   }
