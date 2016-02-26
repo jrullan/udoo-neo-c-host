@@ -1,6 +1,6 @@
 # udoo-neo-c-host
 
-![image](Udoo-Neo.Host.png)
+![image](Udoo-Neo_Host.png)
 
 The Udoo-Neo Host program is a multi-threaded C program that's run in the Linux side of the Udoo-Neo and shall provide a bridge to services and applications running in Linux to be accessed by the M4 Arduino side of the Neo. This project is inspired by Udoo-Library project by David Smerkous's [Udoo Library](https://github.com/smerkousdavid/Udoo-Library).
 
