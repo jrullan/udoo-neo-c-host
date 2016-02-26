@@ -10,6 +10,10 @@
  * 4. Provide a delay of about 100ms before writing again. 
  *    The C program has a poll interval time of about 50ms.
  */
+
+#include "neohost.h"
+
+ 
 #define BUFFER_MAX 64
 #define PIR 4
 #define LED1 13
@@ -18,6 +22,8 @@
 byte buff[BUFFER_MAX];
 unsigned char *intToStr;
 boolean motionDetected = false;
+
+NeoHost neo = NeoHost();
 
 
 typedef struct myTimer{
@@ -33,8 +39,10 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIR,INPUT);
   pinMode(LED1,OUTPUT);
-  timer1.time = 2000;
+  
+  timer1.time = 4000;
   emailDelay.time = 60000;
+  
   intToStr = (unsigned char*) malloc (sizeof(int)/sizeof(unsigned char));
   if(intToStr != NULL) memset(&intToStr,0,sizeof(int)/sizeof(unsigned char));
   memset(&buff,0,BUFFER_MAX);
@@ -45,100 +53,47 @@ void loop() {
   /*
   if(Serial.available()>0){
     byte bytes = readSerial(buff);
-    sendLine("Ard: Bytes received: ",bytes);
-    sendLine("Ard: Message received: ",buff,bytes);
+    neo.sendLine("Ard: Bytes received: ",bytes);
+    neo.sendLine("Ard: Message received: ",buff,bytes);
   }
   */
-  
-  if(digitalRead(PIR)==HIGH){
-    digitalWrite(LED1,HIGH);    
 
-    if(!motionDetected){         // One Shot
-      sendCommand(":Debug","Taking photo");
-      //sendCommand(":Webcam","foto00.jpeg");
-      sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
-      motionDetected = true;
-      resetTimer(&emailDelay);
-    }
-    
-    if(timerDone(&timer1)){ 
-      String message = "Motion Detected ";
-      message += (millis()-emailDelay.last)/1000;
-      sendCommand(":Debug",message);
-      resetTimer(&timer1);
-    }
-    
-  }else{
-    digitalWrite(LED1,LOW);
+  if(digitalRead(PIR)==LOW){
+
+    // Reset motionDetected
     if(timerDone(&emailDelay)){
       motionDetected = false;
     }
+    digitalWrite(LED1,LOW);
     resetTimer(&timer1);
+
+  }else{
+
+    digitalWrite(LED1,HIGH);     
+
+    if(timerDone(&timer1)){
+      int seconds = (millis()-emailDelay.last) / 1000;
+      String message = "Motion Detected ";
+      message += seconds;
+      neo.sendCommand(":Debug",message);
+      neo.sendCommand(":Debug",seconds);
+      
+      if(!motionDetected){         // One Shot
+        neo.sendCommand(":Debug","Taking photo");
+        //neo.sendCommand(":Webcam","foto00.jpeg");
+        //neo.sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
+        motionDetected = true;
+        resetTimer(&emailDelay);
+      }
+
+      resetTimer(&timer1);
+    }    
   }
 
 }
 
 //======================================================
 
-/* 
- * Read serial data into buffer 
- * Returns quantity of bytes read
- */
-byte readSerial(unsigned char *buff){
-  byte bytes;
-  while(Serial.available()>0){
-    buff[bytes++] = Serial.read();
-  }
-  return bytes;
-}
-
-/*
- * Sends a string through the serial
- * as a line. Ending in new line.
- */
-void sendLine(String str){
-  str += '\n';            //append newline character
-  Serial.print(str);
-  Serial.flush();
-  delay(100);
-}
-
-/*
- * Sends a string and an integer value through the serial
- * as a line. Ending in new line.
- */
-void sendLine(String str, int value){
-  str += value;           //append value to string
-  str += '\n';            //append newline character
-  Serial.print(str);
-  Serial.flush();
-  delay(100);
-}
-
-/*
- * Sends a string and an integer value through the serial
- * as a line. Ending in new line.
- */
-void sendCommand(String cmd, int par){
-  cmd += '(';             // :cmd(
-  cmd += par;           //append value to string
-  cmd += ')';             // :cmd(
-  cmd += '\n';            //append newline character
-  Serial.print(cmd);
-  Serial.flush();
-  delay(100);
-}
-
-// string par version of above.
-void sendCommand(String cmd, String par){
-  cmd += '(';             // :cmd(
-  cmd += par;           //append value to string
-  cmd += ')';             // :cmd(
-  cmd += '\n';            //append newline character
-  Serial.print(cmd);
-  Serial.flush();
-  delay(100);  
-}
 
 // Timer utilities functions
 
