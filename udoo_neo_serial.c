@@ -38,7 +38,8 @@
 						
 #define PARS 10			// Max parameters to hold
 #define PARS_SIZE 24	// Max size of characters in each parameter
-#define DEBUG 0
+#define DEBUG 1
+#define UDOONEO_POLL_DELAY 100 //Tested when reading up to 0.1 mS (100)
 
 const char* VALID_COMMANDS[] = {
 	"Database","Debug","Email","HTTPRequest","Log","Webcam","EmailPhoto"
@@ -528,6 +529,15 @@ void init(){
 	while( (receivedBytes = read(fd,inBuff,BUFFER_MAX)) ){
 		if(receivedBytes && DEBUG) printf("Emptied buffer of %d bytes\n",receivedBytes);
 	}
+	clearString((char*)inBuff);
+	usleep(100000);
+	
+	//Send wake up command to Arduino
+	char buffHost[8] = ":wakeup:";
+	int sentBytes = write(fd,buffHost,sizeof(buffHost));
+	if(DEBUG) printf("%d bytes sent\n",sentBytes);
+	usleep(100000);
+	
 	close(fd);
 }
 
@@ -548,7 +558,7 @@ int main(void) {
 	//Threads variables
 	pthread_t logThread;
 	pthread_t emailThread;
-	pthread_t debugThread;
+	//pthread_t debugThread;
 	pthread_t webcamThread;
 	pthread_t emailPhotoThread;
 	
@@ -563,7 +573,14 @@ int main(void) {
 		receivedBytes = read(fd,inBuff,BUFFER_MAX);
 		if(receivedBytes > 0){						// Data found!
 			
-			if(DEBUG) printf("\nPayload size: %d\n",receivedBytes);
+			if(DEBUG){ 
+				printf("\nPayload size: %d\n",receivedBytes);
+				int i;
+				for(i=0;i<receivedBytes;i++){
+					printf("%c",inBuff[i]);
+				}
+				printf("\n");
+			}
 
 			getCmd(inBuff,cmd);
 			getPar(inBuff,par);
@@ -582,7 +599,11 @@ int main(void) {
 			if(compareText(cmd,"Debug")){ //thread is detached so resources can be recycled.
 				command.cmd = cmd;
 				command.par[0] = PARAMETERS[0];
+				
+				time_t now = time(NULL);
+				printf("%s - %s",PARAMETERS[0],ctime(&now));
 
+				/*
 				//=======Call debugFunc in thread======
 				int rc;
 				pthread_attr_t attr;
@@ -594,6 +615,7 @@ int main(void) {
 				}
 				
 				pthread_attr_destroy(&attr);
+				*/
 			}
 
 			if(compareText(cmd,"Log")){
@@ -685,7 +707,7 @@ int main(void) {
 			close(fd);
 			return -1;
 		}
-		usleep(50000);	// poll time approx 50mS (faster crashes the app)
+		usleep(UDOONEO_POLL_DELAY);	// poll time approx 50mS (faster crashes the app)
 	}
 
 	//Free reserved memory

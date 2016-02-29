@@ -56,7 +56,7 @@ void loop() {
     if(!motionDetected){         // One Shot
       sendCommand(":Debug","Taking photo");
       //sendCommand(":Webcam","foto00.jpeg");
-      sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
+      //sendCommand(":EmailPhoto","jerullan@yahoo.com,Security Alert,Motion triggered alarm!");
       motionDetected = true;
       resetTimer(&emailDelay);
     }
