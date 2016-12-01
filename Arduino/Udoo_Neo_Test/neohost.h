@@ -75,7 +75,7 @@ void NeoHost::sendLine(String str, int value){
 template <typename Par>
 bool NeoHost::toA9(String cmd, Par par){
   this->sendCommand(cmd,par);
-  delay(100);
+  delay(20);
   this->readLine();
   if(this->compareText(_inBuff,":7:")){
     return true;
@@ -102,13 +102,9 @@ void NeoHost::sendLine(String str){
 
 //Sends the string message to the Serial object
 void NeoHost::send(String str){
-  //if(this->timer.wait(100)){
     Serial.print(str);
     Serial.flush();
-    //while(!this->timer.done(100));
-    delay(10);
-    //this->timer.reset();
-  //}
+    //delay(10);
 }
 
 //This shall be called in the loop section
