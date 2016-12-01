@@ -38,12 +38,21 @@
 						
 #define PARS 10			// Max parameters to hold
 #define PARS_SIZE 24	// Max size of characters in each parameter
-#define DEBUG 1
+#define DEBUG 0
 #define UDOONEO_POLL_DELAY 100 //Tested when reading up to 0.1 mS (100)
 
 const char* VALID_COMMANDS[] = {
 	"Database","Debug","Email","HTTPRequest","Log","Webcam","EmailPhoto"
 };
+
+/*
+ * Valid responses from host to Arduino:
+ * :0: - sleep
+ * :1: - wakeup
+ * :2: - ok
+ * :3: - failed
+ * :4: - ok with parameter
+ */
 
 //Array for parameters comming from arduino
 char PARAMETERS[PARS][PARS_SIZE];
@@ -134,7 +143,7 @@ int stringSize(char* data){
 }
 
 //Print to stdout the characters in a char array
-void printText(unsigned char* text){
+void printText( char* text){
 	int i = 0;
 	while(text[i] != 0)
 	{
@@ -520,6 +529,15 @@ void *emailPhotoFunc(void *arg){
 }
 
 
+//Send command to Arduino
+void sendCommand(int fd, char* cmd){
+	int len = sizeof(cmd);
+	int sentBytes = write(fd,cmd,len);
+	//printText(cmd);
+	if(DEBUG) printf("Command sent: %s Len of %d, total %d bytes sent\n",cmd, len,sentBytes);
+	usleep(100000);
+}
+
 //Initialize
 void init(){
 	//Clear buffer
@@ -533,13 +551,16 @@ void init(){
 	usleep(100000);
 	
 	//Send wake up command to Arduino
-	char buffHost[8] = ":wakeup:";
+	sendCommand(fd,":1:");
+	/*
+	char buffHost[3] = ":1:";		//wakeup command :1:
 	int sentBytes = write(fd,buffHost,sizeof(buffHost));
 	if(DEBUG) printf("%d bytes sent\n",sentBytes);
 	usleep(100000);
-	
+	*/
 	close(fd);
 }
+
 
 //---------------------------------------------------------------------
 // MAIN PROGRAM
@@ -587,9 +608,16 @@ int main(void) {
 			int pars = parseParameters(par);
 			
 			if(!validCommand(cmd)){
-				printf("Invalid Command: %s\n\n",cmd);
+				int i = 0;
+				printf("Invalid Command: ");
+				for(i=0;i<receivedBytes;i++){
+					printf("%c",inBuff[i]);
+				}
+				printf(" \n\n");
 				continue;
 			}else{	
+				sendCommand(fd,":7:");
+				
 				//printf("Command: %s\n",cmd);
 				//int i = 0;
 				//printf("Parameters found: %d\n",pars);

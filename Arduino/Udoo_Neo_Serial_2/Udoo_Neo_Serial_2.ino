@@ -25,11 +25,7 @@ boolean motionDetected = false;
 int loops = 0;
 
 NeoHost neo = NeoHost();
-Neotimer neoTime = Neotimer(500);
-
-
-//struct myTimer timer1 { .time = 5000, .last = 0, .done = false};
-//struct myTimer emailDelay { .time = 60000, .last = 0, .done = false};
+Neotimer neoTime = Neotimer(10000);
 
 void setup() {
   Serial.begin(115200);
@@ -37,33 +33,29 @@ void setup() {
   pinMode(LED1,OUTPUT);
   digitalWrite(LED1,LOW);
   
-//  timer1.time = 2000;
-//  emailDelay.time = 60000;
-  
   intToStr = (unsigned char*) malloc (sizeof(int)/sizeof(unsigned char));
   if(intToStr != NULL) memset(&intToStr,0,sizeof(int)/sizeof(unsigned char));
   memset(&buff,0,BUFFER_MAX);
+
+  delay(1000);
+  neo.sendCommand(":Email","jerullan@yahoo.com,Udoo Neo, Download Successful!");
+  delay(1000);
 }
 
 void loop() {
-  loops++;
-
-  //if(neoTime.done()){
-
-  /*
-  String mess = "Loop: ";
-  mess += loops;
-  neo.sendCommand(":Debug",mess);
-  delay(1000);
-  */
-  //neoTime.reset();
-  //}
-
+  
   if(neoTime.done()){
-    if(LED1==LOW){
+    String mess = "Loop: ";
+    mess += loops;
+    //neo.sendCommand(":Log",mess);
+    neo.sendCommand(":Debug",mess);
+    loops++;
+    if(digitalRead(LED1)==LOW){
       digitalWrite(LED1,HIGH);
+      //neo.sendCommand(":Debug","ON");
     }else{
       digitalWrite(LED1,LOW);
+      //neo.sendCommand(":Debug","OFF");
     }
     neoTime.reset();
   }

@@ -3,8 +3,6 @@
 
 #include <Arduino.h>
 
-
-
 class Neotimer{
   public:
     //Methods
@@ -12,8 +10,9 @@ class Neotimer{
     ~Neotimer();            //Destructor
     void init();            //Initializations
     boolean done();         //Indicates time has elapsed
+    boolean wait(long _t);  //Indicates time has elapsed
     void reset();           //Resets timer to zero
-    boolean wait();
+    //boolean wait();
     void set(long t);
 
   private:
@@ -47,11 +46,21 @@ void Neotimer::init(){
 // Timer utilities functions
 
 //Checks if timer has elapsed
+boolean Neotimer::wait(long _t){
+  this->_timer.time = _t;
+  return this->done();
+}
+
+
+//Checks if timer has elapsed
 boolean Neotimer::done(){
+  if(this->_timer.done) this->reset();
+  
   if( (millis()-this->_timer.last) >= this->_timer.time){
     this->_timer.done = true;
     return true;
   }
+  
   return false;
 }
 
@@ -68,6 +77,7 @@ void Neotimer::reset(){
 
 
 //Restarts timer and wait until it is finished.
+/*
 boolean Neotimer::wait(){
   if(!this->_waiting){
     this->_timer.last = millis();  
@@ -79,5 +89,6 @@ boolean Neotimer::wait(){
   }
   return false;
 }
+*/
 
 #endif
